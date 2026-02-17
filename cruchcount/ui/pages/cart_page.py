@@ -4,6 +4,7 @@ from dataclasses import dataclass
 from functools import partial
 
 from PyQt6.QtCore import QStringListModel, Qt
+from PyQt6.QtGui import QIntValidator
 from PyQt6.QtWidgets import (
     QComboBox,
     QCompleter,
@@ -17,6 +18,7 @@ from PyQt6.QtWidgets import (
     QLineEdit,
     QMessageBox,
     QPushButton,
+    QStyledItemDelegate,
     QTableWidget,
     QTableWidgetItem,
     QVBoxLayout,
@@ -71,6 +73,19 @@ class UnknownProductDialog(QDialog):
         return float(self.price_input.value())
 
 
+class QuantityItemDelegate(QStyledItemDelegate):
+    def createEditor(self, parent: QWidget, option, index):  # type: ignore[override]
+        editor = QLineEdit(parent)
+        editor.setValidator(QIntValidator(1, 999999, editor))
+        editor.setPlaceholderText("数量")
+        editor.editingFinished.connect(lambda: self._commit_and_close(editor))
+        return editor
+
+    def _commit_and_close(self, editor: QLineEdit) -> None:
+        self.commitData.emit(editor)
+        self.closeEditor.emit(editor, QStyledItemDelegate.EndEditHint.NoHint)
+
+
 class CartPage(QWidget):
     def __init__(self, database: Database) -> None:
         super().__init__()
@@ -99,6 +114,7 @@ class CartPage(QWidget):
         self.table = QTableWidget(0, 6)
         self.table.setHorizontalHeaderLabels(["条码", "商品", "单价", "数量", "小计", "操作"])
         self.table.horizontalHeader().setStretchLastSection(True)
+        self.table.setItemDelegateForColumn(3, QuantityItemDelegate(self.table))
         self.table.cellChanged.connect(self._on_cell_changed)
 
         self.total_qty_label = QLabel("总件数：0")
