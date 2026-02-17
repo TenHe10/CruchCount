@@ -125,6 +125,9 @@ class CartPage(QWidget):
 
         self.total_qty_label = QLabel("总件数：0")
         self.total_amount_label = QLabel("总金额：¥0.00")
+        self.total_amount_label.setStyleSheet(
+            "color: #d32f2f; font-size: 20px; font-weight: 700;"
+        )
         checkout_button = QPushButton("结账")
         checkout_button.clicked.connect(self._checkout)
         clear_button = QPushButton("清空购物车")
