@@ -4,6 +4,7 @@ from dataclasses import dataclass
 
 from PyQt6.QtCore import QStringListModel, Qt
 from PyQt6.QtWidgets import (
+    QAbstractItemView,
     QComboBox,
     QCompleter,
     QDialog,
@@ -98,9 +99,18 @@ class CartPage(QWidget):
         self.table = QTableWidget(0, 5)
         self.table.setHorizontalHeaderLabels(["条码", "商品", "单价", "数量", "小计"])
         self.table.horizontalHeader().setStretchLastSection(True)
+        self.table.setSelectionBehavior(QAbstractItemView.SelectionBehavior.SelectRows)
+        self.table.setSelectionMode(QAbstractItemView.SelectionMode.SingleSelection)
+        self.table.setEditTriggers(QAbstractItemView.EditTrigger.NoEditTriggers)
 
         self.total_qty_label = QLabel("总件数：0")
         self.total_amount_label = QLabel("总金额：¥0.00")
+        decrease_button = QPushButton("减数量")
+        decrease_button.clicked.connect(self._decrease_selected_item)
+        remove_button = QPushButton("删除选中")
+        remove_button.clicked.connect(self._remove_selected_item)
+        checkout_button = QPushButton("结账")
+        checkout_button.clicked.connect(self._checkout)
         clear_button = QPushButton("清空购物车")
         clear_button.clicked.connect(self._clear_cart)
 
@@ -117,6 +127,9 @@ class CartPage(QWidget):
         footer.addWidget(self.total_qty_label)
         footer.addWidget(self.total_amount_label)
         footer.addStretch(1)
+        footer.addWidget(decrease_button)
+        footer.addWidget(remove_button)
+        footer.addWidget(checkout_button)
         footer.addWidget(clear_button)
 
         layout = QVBoxLayout(self)
@@ -210,3 +223,58 @@ class CartPage(QWidget):
         if answer == QMessageBox.StandardButton.Yes:
             self.cart_items.clear()
             self._render_table()
+            self.scan_input.setFocus()
+
+    def _selected_barcode(self) -> str | None:
+        row = self.table.currentRow()
+        if row < 0:
+            return None
+
+        barcode_item = self.table.item(row, 0)
+        if barcode_item is None:
+            return None
+        return barcode_item.text()
+
+    def _decrease_selected_item(self) -> None:
+        barcode = self._selected_barcode()
+        if barcode is None:
+            QMessageBox.information(self, "提示", "请先在购物车中选择一行商品")
+            return
+
+        item = self.cart_items.get(barcode)
+        if item is None:
+            return
+        item.quantity -= 1
+        if item.quantity <= 0:
+            del self.cart_items[barcode]
+        self._render_table()
+        self.scan_input.setFocus()
+
+    def _remove_selected_item(self) -> None:
+        barcode = self._selected_barcode()
+        if barcode is None:
+            QMessageBox.information(self, "提示", "请先在购物车中选择一行商品")
+            return
+
+        if barcode in self.cart_items:
+            del self.cart_items[barcode]
+            self._render_table()
+        self.scan_input.setFocus()
+
+    def _checkout(self) -> None:
+        if not self.cart_items:
+            QMessageBox.information(self, "提示", "购物车为空，无法结账")
+            return
+
+        total_qty = sum(item.quantity for item in self.cart_items.values())
+        total_amount = sum(item.subtotal for item in self.cart_items.values())
+        answer = QMessageBox.question(
+            self,
+            "确认结账",
+            f"共 {total_qty} 件，合计 ¥{total_amount:.2f}。\n确认结账吗？",
+        )
+        if answer == QMessageBox.StandardButton.Yes:
+            QMessageBox.information(self, "结账完成", f"实收金额：¥{total_amount:.2f}")
+            self.cart_items.clear()
+            self._render_table()
+            self.scan_input.setFocus()
