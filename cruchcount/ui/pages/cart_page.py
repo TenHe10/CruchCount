@@ -1,10 +1,10 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
+from functools import partial
 
 from PyQt6.QtCore import QStringListModel, Qt
 from PyQt6.QtWidgets import (
-    QAbstractItemView,
     QComboBox,
     QCompleter,
     QDialog,
@@ -96,19 +96,13 @@ class CartPage(QWidget):
         add_manual_button = QPushButton("手动加入")
         add_manual_button.clicked.connect(self._on_manual_submitted)
 
-        self.table = QTableWidget(0, 5)
-        self.table.setHorizontalHeaderLabels(["条码", "商品", "单价", "数量", "小计"])
+        self.table = QTableWidget(0, 6)
+        self.table.setHorizontalHeaderLabels(["条码", "商品", "单价", "数量", "小计", "操作"])
         self.table.horizontalHeader().setStretchLastSection(True)
-        self.table.setSelectionBehavior(QAbstractItemView.SelectionBehavior.SelectRows)
-        self.table.setSelectionMode(QAbstractItemView.SelectionMode.SingleSelection)
-        self.table.setEditTriggers(QAbstractItemView.EditTrigger.NoEditTriggers)
+        self.table.cellChanged.connect(self._on_cell_changed)
 
         self.total_qty_label = QLabel("总件数：0")
         self.total_amount_label = QLabel("总金额：¥0.00")
-        decrease_button = QPushButton("减数量")
-        decrease_button.clicked.connect(self._decrease_selected_item)
-        remove_button = QPushButton("删除选中")
-        remove_button.clicked.connect(self._remove_selected_item)
         checkout_button = QPushButton("结账")
         checkout_button.clicked.connect(self._checkout)
         clear_button = QPushButton("清空购物车")
@@ -127,8 +121,6 @@ class CartPage(QWidget):
         footer.addWidget(self.total_qty_label)
         footer.addWidget(self.total_amount_label)
         footer.addStretch(1)
-        footer.addWidget(decrease_button)
-        footer.addWidget(remove_button)
         footer.addWidget(checkout_button)
         footer.addWidget(clear_button)
 
@@ -199,6 +191,7 @@ class CartPage(QWidget):
 
     def _render_table(self) -> None:
         items = list(self.cart_items.values())
+        self.table.blockSignals(True)
         self.table.setRowCount(len(items))
 
         total_qty = 0
@@ -207,14 +200,33 @@ class CartPage(QWidget):
             total_qty += item.quantity
             total_amount += item.subtotal
 
-            self.table.setItem(row, 0, QTableWidgetItem(item.barcode))
-            self.table.setItem(row, 1, QTableWidgetItem(item.name))
-            self.table.setItem(row, 2, QTableWidgetItem(f"¥{item.price:.2f}"))
-            self.table.setItem(row, 3, QTableWidgetItem(str(item.quantity)))
-            self.table.setItem(row, 4, QTableWidgetItem(f"¥{item.subtotal:.2f}"))
+            barcode_item = QTableWidgetItem(item.barcode)
+            name_item = QTableWidgetItem(item.name)
+            price_item = QTableWidgetItem(f"¥{item.price:.2f}")
+            quantity_item = QTableWidgetItem(str(item.quantity))
+            subtotal_item = QTableWidgetItem(f"¥{item.subtotal:.2f}")
+
+            barcode_item.setFlags(barcode_item.flags() & ~Qt.ItemFlag.ItemIsEditable)
+            name_item.setFlags(name_item.flags() & ~Qt.ItemFlag.ItemIsEditable)
+            price_item.setFlags(price_item.flags() & ~Qt.ItemFlag.ItemIsEditable)
+            subtotal_item.setFlags(subtotal_item.flags() & ~Qt.ItemFlag.ItemIsEditable)
+            quantity_item.setFlags(
+                quantity_item.flags() | Qt.ItemFlag.ItemIsEditable | Qt.ItemFlag.ItemIsEnabled
+            )
+
+            self.table.setItem(row, 0, barcode_item)
+            self.table.setItem(row, 1, name_item)
+            self.table.setItem(row, 2, price_item)
+            self.table.setItem(row, 3, quantity_item)
+            self.table.setItem(row, 4, subtotal_item)
+
+            remove_button = QPushButton("移除")
+            remove_button.clicked.connect(partial(self._remove_item_by_barcode, item.barcode))
+            self.table.setCellWidget(row, 5, remove_button)
 
         self.total_qty_label.setText(f"总件数：{total_qty}")
         self.total_amount_label.setText(f"总金额：¥{total_amount:.2f}")
+        self.table.blockSignals(False)
 
     def _clear_cart(self) -> None:
         if not self.cart_items:
@@ -225,41 +237,38 @@ class CartPage(QWidget):
             self._render_table()
             self.scan_input.setFocus()
 
-    def _selected_barcode(self) -> str | None:
-        row = self.table.currentRow()
-        if row < 0:
-            return None
-
-        barcode_item = self.table.item(row, 0)
-        if barcode_item is None:
-            return None
-        return barcode_item.text()
-
-    def _decrease_selected_item(self) -> None:
-        barcode = self._selected_barcode()
-        if barcode is None:
-            QMessageBox.information(self, "提示", "请先在购物车中选择一行商品")
-            return
-
-        item = self.cart_items.get(barcode)
-        if item is None:
-            return
-        item.quantity -= 1
-        if item.quantity <= 0:
-            del self.cart_items[barcode]
-        self._render_table()
-        self.scan_input.setFocus()
-
-    def _remove_selected_item(self) -> None:
-        barcode = self._selected_barcode()
-        if barcode is None:
-            QMessageBox.information(self, "提示", "请先在购物车中选择一行商品")
-            return
-
+    def _remove_item_by_barcode(self, barcode: str) -> None:
         if barcode in self.cart_items:
             del self.cart_items[barcode]
             self._render_table()
         self.scan_input.setFocus()
+
+    def _on_cell_changed(self, row: int, column: int) -> None:
+        if column != 3:
+            return
+
+        barcode_item = self.table.item(row, 0)
+        quantity_item = self.table.item(row, 3)
+        if barcode_item is None or quantity_item is None:
+            return
+
+        barcode = barcode_item.text()
+        cart_item = self.cart_items.get(barcode)
+        if cart_item is None:
+            return
+
+        text = quantity_item.text().strip()
+        try:
+            quantity = int(text)
+            if quantity <= 0:
+                raise ValueError
+        except ValueError:
+            QMessageBox.warning(self, "提示", "数量必须是大于 0 的整数")
+            self._render_table()
+            return
+
+        cart_item.quantity = quantity
+        self._render_table()
 
     def _checkout(self) -> None:
         if not self.cart_items:
