@@ -1,5 +1,8 @@
+from cruchcount.app import run_app
+
+
 def main():
-    print("Hello from cruchcount!")
+    run_app()
 
 
 if __name__ == "__main__":
