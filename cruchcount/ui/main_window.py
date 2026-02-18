@@ -20,7 +20,28 @@ class MainWindow(QMainWindow):
         super().__init__()
         self.database = database
         self.setWindowTitle("CruchCount")
-        self.resize(980, 640)
+        self.resize(1180, 760)
+        self.setStyleSheet(
+            """
+            QWidget {
+                font-size: 16px;
+            }
+            QLineEdit, QComboBox, QDoubleSpinBox {
+                min-height: 40px;
+            }
+            QPushButton {
+                min-height: 42px;
+                padding: 0 14px;
+            }
+            QTableWidget {
+                font-size: 15px;
+            }
+            QHeaderView::section {
+                font-size: 15px;
+                padding: 6px;
+            }
+            """
+        )
 
         root = QWidget()
         self.setCentralWidget(root)

@@ -3,7 +3,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from functools import partial
 
-from PyQt6.QtCore import QStringListModel, Qt, QTimer
+from PyQt6.QtCore import QStringListModel, Qt
 from PyQt6.QtGui import QIntValidator
 from PyQt6.QtWidgets import (
     QComboBox,
@@ -91,14 +91,8 @@ class CartPage(QWidget):
         super().__init__()
         self.database = database
         self.cart_items: dict[str, CartItem] = {}
-        self.scan_timer = QTimer(self)
-        self.scan_timer.setSingleShot(True)
-        self.scan_timer.setInterval(120)
-        self.scan_timer.timeout.connect(self._consume_scan_input)
-
         self.scan_input = QLineEdit()
         self.scan_input.setPlaceholderText("扫码枪输入后回车，支持连续扫码")
-        self.scan_input.textEdited.connect(self._on_scan_text_edited)
         self.scan_input.returnPressed.connect(self._on_scan_submitted)
 
         self.manual_combo = QComboBox()
@@ -158,12 +152,6 @@ class CartPage(QWidget):
         self.scan_input.setFocus()
 
     def _on_scan_submitted(self) -> None:
-        self._consume_scan_input()
-
-    def _on_scan_text_edited(self, _text: str) -> None:
-        self.scan_timer.start()
-
-    def _consume_scan_input(self) -> None:
         barcode = self.scan_input.text().strip()
         if not barcode:
             return
