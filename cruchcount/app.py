@@ -17,4 +17,4 @@ def run_app() -> None:
     window = MainWindow(database=database)
     window.show()
     app.exec()
-    database.close()
+    window.database.close()

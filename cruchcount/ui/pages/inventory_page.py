@@ -72,6 +72,13 @@ class InventoryPage(QWidget):
 
         self._update_barcode_suggestions("")
 
+    def set_database(self, database: Database) -> None:
+        self.database = database
+        self.barcode_combo.lineEdit().clear()
+        self.name_input.clear()
+        self.price_input.setValue(1.0)
+        self._update_barcode_suggestions("")
+
     def save_product(self) -> None:
         barcode = self.barcode_combo.currentText().strip().split(" | ", 1)[0].strip()
         name = self.name_input.text().strip()

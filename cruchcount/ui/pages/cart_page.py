@@ -151,6 +151,13 @@ class CartPage(QWidget):
         self._update_suggestions("")
         self.scan_input.setFocus()
 
+    def set_database(self, database: Database) -> None:
+        self.database = database
+        self.cart_items.clear()
+        self._render_table()
+        self._update_suggestions("")
+        self.scan_input.setFocus()
+
     def _on_scan_submitted(self) -> None:
         barcode = self.scan_input.text().strip()
         if not barcode:
