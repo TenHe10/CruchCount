@@ -78,7 +78,7 @@ class MainWindow(QMainWindow):
         self.stack.setCurrentWidget(self.cart_page)
 
     def _choose_database_file(self) -> None:
-        selected_path, _ = QFileDialog.getSaveFileName(
+        selected_path, _ = QFileDialog.getOpenFileName(
             self,
             "选择数据库文件",
             str(self.database.path),
@@ -88,6 +88,9 @@ class MainWindow(QMainWindow):
             return
 
         new_path = Path(selected_path)
+        if not new_path.exists():
+            QMessageBox.warning(self, "提示", "请选择已存在的数据库文件")
+            return
         if new_path == self.database.path:
             return
 
